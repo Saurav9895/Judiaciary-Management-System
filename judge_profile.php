@@ -61,10 +61,20 @@ $user = $result->fetch_assoc();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Profile - JIS</title>
+    <title>Judge Profile - JIS</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
 </head>
 <body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">JIS - Judge Dashboard</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="search_cases.php">Search Cases</a>
+
+                <a class="nav-link" href="logout.php">Logout</a>
+            </div>
+        </div>
+    </nav>
     <div class="container mt-5">
         <h2>User Profile</h2>
         <?php if ($message): ?>
@@ -107,7 +117,7 @@ $user = $result->fetch_assoc();
                 <input type="text" class="form-control" id="specialization" name="specialization" value="<?php echo htmlspecialchars($user['specialization'] ?? ''); ?>">
             </div>
             <button type="submit" class="btn btn-primary">Update Profile</button>
-            <a href="registrar_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
+            <a href="judge_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
         </form>
     </div>
 

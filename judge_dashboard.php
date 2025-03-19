@@ -60,6 +60,8 @@ $past_cases = $stmt->get_result();
             <a class="navbar-brand" href="#">JIS - Judge Dashboard</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php">Search Cases</a>
+                <a class="nav-link" href="judge_profile.php">Profile</a> <!-- Add Profile Link -->
+
                 <a class="nav-link" href="logout.php">Logout</a>
             </div>
         </div>

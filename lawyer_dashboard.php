@@ -2,7 +2,12 @@
 session_start();
 require_once 'db_connect.php';
 
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'lawyer') {
+if (!isset($_SESSION['user_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+if ($_SESSION['role'] !== 'lawyer') {
     header("Location: login.php");
     exit();
 }
@@ -44,6 +49,30 @@ $stmt = $conn->prepare($past_cases_query);
 $stmt->bind_param("i", $lawyer_id);
 $stmt->execute();
 $past_cases = $stmt->get_result();
+
+// Fetch all past cases (not assigned to this lawyer)
+$all_past_cases_query = "SELECT c.*, u.full_name as judge_name 
+                         FROM cases c 
+                         LEFT JOIN users u ON c.judge_id = u.user_id 
+                         WHERE c.status = 'closed' AND c.case_id NOT IN (
+                             SELECT case_id FROM case_assignments WHERE user_id = ?
+                         )
+                         ORDER BY c.start_date DESC";
+$stmt = $conn->prepare($all_past_cases_query);
+$stmt->bind_param("i", $lawyer_id);
+$stmt->execute();
+$all_past_cases = $stmt->get_result();
+
+// Fetch case access history with fees
+$access_history_sql = "SELECT c.cin, c.defendant_name, c.crime_type, cb.access_date, cb.fee_amount 
+                      FROM case_browsing_history cb
+                      JOIN cases c ON cb.cin = c.cin
+                      WHERE cb.lawyer_id = ?
+                      ORDER BY cb.access_date DESC";
+$access_stmt = $conn->prepare($access_history_sql);
+$access_stmt->bind_param("i", $lawyer_id);
+$access_stmt->execute();
+$access_history = $access_stmt->get_result();
 ?>
 
 <!DOCTYPE html>
@@ -60,8 +89,7 @@ $past_cases = $stmt->get_result();
             <a class="navbar-brand" href="#">JIS - Lawyer Dashboard</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php">Search Cases</a>
-                <a class="nav-link" href="lawyer_profile.php">Profile</a> <!-- Add Profile Link -->
-
+                <a class="nav-link" href="lawyer_profile.php">Profile</a>
                 <a class="nav-link" href="logout.php">Logout</a>
             </div>
         </div>
@@ -141,6 +169,100 @@ $past_cases = $stmt->get_result();
                             </div>
                         <?php else: ?>
                             <p class="text-muted">No past cases found</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Public Case Records (Fee: $10 per case)</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php if ($all_past_cases->num_rows > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>CIN</th>
+                                            <th>Defendant</th>
+                                            <th>Crime Type</th>
+                                            <th>Judge</th>
+                                            <th>Start Date</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php while($case = $all_past_cases->fetch_assoc()): ?>
+                                            <tr>
+                                                <td><?php echo $case['cin']; ?></td>
+                                                <td><?php echo $case['defendant_name']; ?></td>
+                                                <td><?php echo $case['crime_type']; ?></td>
+                                                <td><?php echo $case['judge_name']; ?></td>
+                                                <td><?php echo $case['start_date']; ?></td>
+                                                <td>
+                                                    <form method="POST" action="access_case.php">
+                                                        <input type="hidden" name="case_id" value="<?php echo $case['case_id']; ?>">
+                                                        <input type="hidden" name="cin" value="<?php echo $case['cin']; ?>">
+                                                        <button type="submit" class="btn btn-sm btn-primary">View ($10)</button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endwhile; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-muted">No public case records available</p>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-4">
+            <div class="col">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Case Access History</h5>
+                    </div>
+                    <div class="card-body">
+                        <?php if ($access_history->num_rows > 0): ?>
+                            <div class="table-responsive">
+                                <table class="table table-striped">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>CIN</th>
+                                            <th>Defendant</th>
+                                            <th>Crime Type</th>
+                                            <th>Fee</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php 
+                                        $total_fees = 0;
+                                        while($access = $access_history->fetch_assoc()): 
+                                            $total_fees += $access['fee_amount'];
+                                        ?>
+                                            <tr>
+                                                <td><?php echo $access['access_date']; ?></td>
+                                                <td><?php echo $access['cin']; ?></td>
+                                                <td><?php echo $access['defendant_name']; ?></td>
+                                                <td><?php echo $access['crime_type']; ?></td>
+                                                <td>$<?php echo number_format($access['fee_amount'], 2); ?></td>
+                                            </tr>
+                                        <?php endwhile; ?>
+                                        <tr class="table-info">
+                                            <td colspan="4" class="text-right"><strong>Total Fees:</strong></td>
+                                            <td><strong>$<?php echo number_format($total_fees, 2); ?></strong></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <p class="text-muted">No case access history</p>
                         <?php endif; ?>
                     </div>
                 </div>

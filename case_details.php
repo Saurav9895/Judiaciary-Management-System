@@ -30,6 +30,33 @@ if (!$case) {
     exit();
 }
 
+// Check access for lawyers
+if ($_SESSION['role'] === 'lawyer') {
+    $lawyer_id = $_SESSION['user_id'];
+    
+    // Check if case is assigned to this lawyer
+    $assigned_sql = "SELECT 1 FROM case_assignments WHERE case_id = ? AND user_id = ? AND role = 'lawyer'";
+    $assigned_stmt = $conn->prepare($assigned_sql);
+    $assigned_stmt->bind_param("ii", $case['case_id'], $lawyer_id);
+    $assigned_stmt->execute();
+    $assigned_result = $assigned_stmt->get_result();
+    
+    // Check if lawyer has paid for this case (if not assigned)
+    if ($assigned_result->num_rows === 0) {
+        $paid_sql = "SELECT 1 FROM case_browsing_history WHERE lawyer_id = ? AND cin = ?";
+        $paid_stmt = $conn->prepare($paid_sql);
+        $paid_stmt->bind_param("is", $lawyer_id, $cin);
+        $paid_stmt->execute();
+        $paid_result = $paid_stmt->get_result();
+        
+        if ($paid_result->num_rows === 0) {
+            $_SESSION['error'] = "You must pay the access fee to view this case record";
+            header("Location: lawyer_dashboard.php");
+            exit();
+        }
+    }
+}
+
 // Fetch hearings
 $hearings_sql = "SELECT * FROM hearings WHERE case_id = ? ORDER BY hearing_date DESC";
 $hearings_stmt = $conn->prepare($hearings_sql);
@@ -57,6 +84,10 @@ $judgments = $judgments_result->fetch_all(MYSQLI_ASSOC);
 </head>
 <body>
     <div class="container mt-5">
+        <?php if (isset($_SESSION['error'])): ?>
+            <div class="alert alert-danger"><?php echo $_SESSION['error']; unset($_SESSION['error']); ?></div>
+        <?php endif; ?>
+        
         <h2>Case Details</h2>
         <div class="card mb-4">
             <div class="card-body">
@@ -107,7 +138,7 @@ $judgments = $judgments_result->fetch_all(MYSQLI_ASSOC);
             <p class="text-muted">No judgments recorded</p>
         <?php endif; ?>
 
-        <a href="registrar_dashboard.php" class="btn btn-secondary mt-4">Back to Dashboard</a>
+        <a href="lawyer_dashboard.php" class="btn btn-secondary mt-4">Back to Dashboard</a>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>

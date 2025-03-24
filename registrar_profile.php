@@ -59,11 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $stmt->bind_param('sssss', $username, $password, $role, $full_name, $email);
 
     if ($stmt->execute()) {
-        // Set success message in session
-        $_SESSION['message'] = 'User added successfully!';
-        // Redirect back to the same page
-        header('Location: registrar_profile.php');
-        exit();
+        $message = 'User added successfully!';
     } else {
         $message = 'Error adding user: ' . $conn->error;
     }
@@ -79,12 +75,6 @@ $stmt->bind_param('i', $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 $user = $result->fetch_assoc();
-
-// Display success message from session
-if (isset($_SESSION['message'])) {
-    $message = $_SESSION['message'];
-    unset($_SESSION['message']); // Clear the message after displaying
-}
 ?>
 
 <!DOCTYPE html>
@@ -98,96 +88,96 @@ if (isset($_SESSION['message'])) {
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container">
-        <a class="navbar-brand" href="#">JIS - Registrar Dashboard</a>
-        <div class="navbar-nav ms-auto">
-            <a class="nav-link" href="search_cases.php">Search Cases</a>
-            <a class="nav-link" href="logout.php">Logout</a>
-        </div>
-    </div>
-</nav>
+        <div class="container">
+            <a class="navbar-brand" href="#">JIS - Registrar Dashboard</a>
+            <div class="navbar-nav ms-auto">
+                <a class="nav-link" href="search_cases.php">Search Cases</a>
 
-<div class="container mt-5">
-    <h2>User Profile</h2>
-    <?php if ($message): ?>
-        <div class="alert alert-info"><?php echo $message; ?></div>
-    <?php endif; ?>
+                <a class="nav-link" href="logout.php">Logout</a>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-5">
+        <h2>User Profile</h2>
+        <?php if ($message): ?>
+            <div class="alert alert-info"><?php echo $message; ?></div>
+        <?php endif; ?>
 
-    <div class="card mb-4">
-        <div class="card-body">
-            <h5 class="card-title">Profile Details</h5>
-            <p class="card-text"><strong>Username:</strong> <?php echo htmlspecialchars($user['username']); ?></p>
-            <p class="card-text"><strong>Role:</strong> <?php echo htmlspecialchars($user['role']); ?></p>
-            <p class="card-text"><strong>Full Name:</strong> <?php echo htmlspecialchars($user['full_name']); ?></p>
-            <p class="card-text"><strong>Email:</strong> <?php echo htmlspecialchars($user['email']); ?></p>
-            <p class="card-text"><strong>Phone:</strong> <?php echo htmlspecialchars($user['phone'] ?? 'Not provided'); ?></p>
-            <p class="card-text"><strong>Address:</strong> <?php echo htmlspecialchars($user['address'] ?? 'Not provided'); ?></p>
-            <p class="card-text"><strong>Specialization:</strong> <?php echo htmlspecialchars($user['specialization'] ?? 'Not provided'); ?></p>
+        <div class="card mb-4">
+            <div class="card-body">
+                <h5 class="card-title">Profile Details</h5>
+                <p class="card-text"><strong>Username:</strong> <?php echo htmlspecialchars($user['username']); ?></p>
+                <p class="card-text"><strong>Role:</strong> <?php echo htmlspecialchars($user['role']); ?></p>
+                <p class="card-text"><strong>Full Name:</strong> <?php echo htmlspecialchars($user['full_name']); ?></p>
+                <p class="card-text"><strong>Email:</strong> <?php echo htmlspecialchars($user['email']); ?></p>
+                <p class="card-text"><strong>Phone:</strong> <?php echo htmlspecialchars($user['phone'] ?? 'Not provided'); ?></p>
+                <p class="card-text"><strong>Address:</strong> <?php echo htmlspecialchars($user['address'] ?? 'Not provided'); ?></p>
+                <p class="card-text"><strong>Specialization:</strong> <?php echo htmlspecialchars($user['specialization'] ?? 'Not provided'); ?></p>
+            </div>
         </div>
-    </div>
 
-    <h3>Update Profile</h3>
-    <form method="POST" class="mt-4">
-        <input type="hidden" name="update_profile">
-        <div class="form-group">
-            <label for="full_name">Full Name</label>
-            <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="email">Email</label>
-            <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
-        </div>
-        <div class="form-group">
-            <label for="phone">Phone</label>
-            <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
-        </div>
-        <div class="form-group">
-            <label for="address">Address</label>
-            <textarea class="form-control" id="address" name="address" rows="3"><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
-        </div>
-        <div class="form-group">
-            <label for="specialization">Specialization</label>
-            <input type="text" class="form-control" id="specialization" name="specialization" value="<?php echo htmlspecialchars($user['specialization'] ?? ''); ?>">
-        </div>
-        <button type="submit" class="btn btn-primary">Update Profile</button>
-        <a href="registrar_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
-    </form>
-
-    <?php if ($role === 'registrar'): ?>
-        <hr>
-        <h3>Add New User (Judge/Lawyer)</h3>
+        <h3>Update Profile</h3>
         <form method="POST" class="mt-4">
-            <input type="hidden" name="add_user">
-            <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" class="form-control" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <div class="form-group">
-                <label for="role">Role</label>
-                <select class="form-control" id="role" name="role" required>
-                    <option value="judge">Judge</option>
-                    <option value="lawyer">Lawyer</option>
-                </select>
-            </div>
+            <input type="hidden" name="update_profile">
             <div class="form-group">
                 <label for="full_name">Full Name</label>
-                <input type="text" class="form-control" id="full_name" name="full_name" required>
+                <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
             </div>
             <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" class="form-control" id="email" name="email" required>
+                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
             </div>
-            <button type="submit" class="btn btn-success">Add User</button>
+            <div class="form-group">
+                <label for="phone">Phone</label>
+                <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
+            </div>
+            <div class="form-group">
+                <label for="address">Address</label>
+                <textarea class="form-control" id="address" name="address" rows="3"><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
+            </div>
+            <div class="form-group">
+                <label for="specialization">Specialization</label>
+                <input type="text" class="form-control" id="specialization" name="specialization" value="<?php echo htmlspecialchars($user['specialization'] ?? ''); ?>">
+            </div>
+            <button type="submit" class="btn btn-primary">Update Profile</button>
         </form>
-    <?php endif; ?>
-</div>
 
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+        <?php if ($role === 'registrar'): ?>
+            <hr>
+            <h3>Add New User (Judge/Lawyer)</h3>
+            <form method="POST" class="mt-4">
+                <input type="hidden" name="add_user">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" class="form-control" id="username" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                </div>
+                <div class="form-group">
+                    <label for="role">Role</label>
+                    <select class="form-control" id="role" name="role" required>
+                        <option value="judge">Judge</option>
+                        <option value="lawyer">Lawyer</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="full_name">Full Name</label>
+                    <input type="text" class="form-control" id="full_name" name="full_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" class="form-control" id="email" name="email" required>
+                </div>
+                <button type="submit" class="btn btn-success">Add User</button>
+                <a href="registrar_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
+            </form>
+        <?php endif; ?>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

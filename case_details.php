@@ -49,11 +49,11 @@ if ($_SESSION['role'] === 'lawyer') {
         $paid_stmt->execute();
         $paid_result = $paid_stmt->get_result();
         
-        if ($paid_result->num_rows === 0) {
-            $_SESSION['error'] = "You must pay the access fee to view this case record";
-            header("Location: lawyer_dashboard.php");
-            exit();
-        }
+        // if ($paid_result->num_rows === 0) {
+        //     $_SESSION['error'] = "You must pay the access fee to view this case record";
+        //     header("Location: lawyer_dashboard.php");
+        //     exit();
+        // }
     }
 }
 

@@ -92,6 +92,8 @@ $user = $result->fetch_assoc();
             <a class="navbar-brand" href="#">JIS - Registrar Dashboard</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php">Search Cases</a>
+                <a class="nav-link" href="statistics.php">Statistics</a>
+                <a class="nav-link" href="audit_logs.php">Log Audit</a>
 
                 <a class="nav-link" href="logout.php">Logout</a>
             </div>

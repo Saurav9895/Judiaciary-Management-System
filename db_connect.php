@@ -12,6 +12,37 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+
+function logAudit($conn, $user_id, $action_type, $table_name, $record_id, $old_values = null, $new_values = null) {
+    $ip_address = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    
+    $sql = "INSERT INTO audit_logs 
+            (user_id, action_type, table_name, record_id, old_values, new_values, ip_address) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    
+    $old_values_json = $old_values ? json_encode($old_values) : null;
+    $new_values_json = $new_values ? json_encode($new_values) : null;
+    
+    $stmt->bind_param("ississs", 
+        $user_id, 
+        $action_type, 
+        $table_name, 
+        $record_id, 
+        $old_values_json, 
+        $new_values_json, 
+        $ip_address
+    );
+    
+    $stmt->execute();
+}
+
+// Register shutdown function to ensure connection closes
+register_shutdown_function(function() use ($conn) {
+    $conn->close();
+});
+
+
 // Create database if not exists
 $sql = "CREATE DATABASE IF NOT EXISTS $dbname";
 if ($conn->query($sql) === TRUE) {

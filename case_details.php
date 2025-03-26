@@ -467,7 +467,7 @@ function canPreview($type) {
                 </div>
             </div>
             
-            <div class="col-lg-4">
+            <!-- <div class="col-lg-4">
                 <div class="case-card">
                     <div class="case-card-header">
                         <i class="fas fa-file-contract me-2"></i>Judgments & Rulings
@@ -554,7 +554,7 @@ function canPreview($type) {
                         <?php endif; ?>
                     </div>
                 </div>
-            </div>
+            </div> -->
         </div>
         
         <div class="text-center mt-4">

@@ -45,6 +45,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     }
 }
 
+// Handle password change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    $current_password = $_POST['current_password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
+    
+    // Validate passwords
+    if ($new_password !== $confirm_password) {
+        $message = 'New password and confirmation do not match.';
+    } else {
+        // Verify current password
+        $sql = "SELECT password FROM users WHERE user_id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('i', $user_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user_data = $result->fetch_assoc();
+        
+        if (password_verify($current_password, $user_data['password'])) {
+            // Update password
+            $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+            $update_sql = "UPDATE users SET password = ? WHERE user_id = ?";
+            $update_stmt = $conn->prepare($update_sql);
+            $update_stmt->bind_param('si', $hashed_password, $user_id);
+            
+            if ($update_stmt->execute()) {
+                $message = 'Password changed successfully!';
+            } else {
+                $message = 'Error changing password: ' . $conn->error;
+            }
+        } else {
+            $message = 'Current password is incorrect.';
+        }
+    }
+}
+
 // Handle adding new user (Judge/Lawyer)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $username = mysqli_real_escape_string($conn, $_POST['username']);
@@ -84,68 +120,96 @@ $user = $result->fetch_assoc();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Profile - JIS</title>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <style>
+        .password-section, .add-user-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+    </style>
 </head>
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container">
+    <div class="container">
         <a class="navbar-brand" href="registrar_dashboard.php">JIS - Registrar Dashboard</a>
         <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="search_cases.php">Search Cases</a>
-                <a class="nav-link" href="statistics.php">Statistics</a>
-                <a class="nav-link" href="audit_logs.php">Log Audit</a>
-
-                <a class="nav-link" href="logout.php">Logout</a>
-            </div>
+            <a class="nav-link" href="search_cases.php">Search Cases</a>
+            <a class="nav-link" href="statistics.php">Statistics</a>
+            <a class="nav-link" href="audit_logs.php">Log Audit</a>
+            <a class="nav-link" href="logout.php">Logout</a>
         </div>
-    </nav>
-    <div class="container mt-5">
-        <h2>User Profile</h2>
-        <?php if ($message): ?>
-            <div class="alert alert-info"><?php echo $message; ?></div>
-        <?php endif; ?>
+    </div>
+</nav>
 
-        <div class="card mb-4">
-            <div class="card-body">
-                <h5 class="card-title">Profile Details</h5>
-                <p class="card-text"><strong>Username:</strong> <?php echo htmlspecialchars($user['username']); ?></p>
-                <p class="card-text"><strong>Role:</strong> <?php echo htmlspecialchars($user['role']); ?></p>
-                <p class="card-text"><strong>Full Name:</strong> <?php echo htmlspecialchars($user['full_name']); ?></p>
-                <p class="card-text"><strong>Email:</strong> <?php echo htmlspecialchars($user['email']); ?></p>
-                <p class="card-text"><strong>Phone:</strong> <?php echo htmlspecialchars($user['phone'] ?? 'Not provided'); ?></p>
-                <p class="card-text"><strong>Address:</strong> <?php echo htmlspecialchars($user['address'] ?? 'Not provided'); ?></p>
-                <p class="card-text"><strong>Specialization:</strong> <?php echo htmlspecialchars($user['specialization'] ?? 'Not provided'); ?></p>
-            </div>
+<div class="container mt-5">
+    <h2>User Profile</h2>
+    <?php if ($message): ?>
+        <div class="alert alert-info"><?php echo $message; ?></div>
+    <?php endif; ?>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Profile Details</h5>
+            <p class="card-text"><strong>Username:</strong> <?php echo htmlspecialchars($user['username']); ?></p>
+            <p class="card-text"><strong>Role:</strong> <?php echo htmlspecialchars($user['role']); ?></p>
+            <p class="card-text"><strong>Full Name:</strong> <?php echo htmlspecialchars($user['full_name']); ?></p>
+            <p class="card-text"><strong>Email:</strong> <?php echo htmlspecialchars($user['email']); ?></p>
+            <p class="card-text"><strong>Phone:</strong> <?php echo htmlspecialchars($user['phone'] ?? 'Not provided'); ?></p>
+            <p class="card-text"><strong>Address:</strong> <?php echo htmlspecialchars($user['address'] ?? 'Not provided'); ?></p>
+            <p class="card-text"><strong>Specialization:</strong> <?php echo htmlspecialchars($user['specialization'] ?? 'Not provided'); ?></p>
         </div>
+    </div>
 
-        <h3>Update Profile</h3>
+    <h3>Update Profile</h3>
+    <form method="POST" class="mt-4">
+        <input type="hidden" name="update_profile">
+        <div class="form-group">
+            <label for="full_name">Full Name</label>
+            <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
+        </div>
+        <div class="form-group">
+            <label for="email">Email</label>
+            <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
+        </div>
+        <div class="form-group">
+            <label for="phone">Phone</label>
+            <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
+        </div>
+        <div class="form-group">
+            <label for="address">Address</label>
+            <textarea class="form-control" id="address" name="address" rows="3"><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
+        </div>
+        <div class="form-group">
+            <label for="specialization">Specialization</label>
+            <input type="text" class="form-control" id="specialization" name="specialization" value="<?php echo htmlspecialchars($user['specialization'] ?? ''); ?>">
+        </div>
+        <button type="submit" class="btn btn-primary">Update Profile</button>
+    </form>
+
+    <div class="password-section">
+        <h3>Change Password</h3>
         <form method="POST" class="mt-4">
-            <input type="hidden" name="update_profile">
+            <input type="hidden" name="change_password">
             <div class="form-group">
-                <label for="full_name">Full Name</label>
-                <input type="text" class="form-control" id="full_name" name="full_name" value="<?php echo htmlspecialchars($user['full_name'] ?? ''); ?>" required>
+                <label for="current_password">Current Password</label>
+                <input type="password" class="form-control" id="current_password" name="current_password" required>
             </div>
             <div class="form-group">
-                <label for="email">Email</label>
-                <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($user['email'] ?? ''); ?>" required>
+                <label for="new_password">New Password</label>
+                <input type="password" class="form-control" id="new_password" name="new_password" required>
+                <small class="form-text text-muted">Password must be at least 8 characters long.</small>
             </div>
             <div class="form-group">
-                <label for="phone">Phone</label>
-                <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
+                <label for="confirm_password">Confirm New Password</label>
+                <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
             </div>
-            <div class="form-group">
-                <label for="address">Address</label>
-                <textarea class="form-control" id="address" name="address" rows="3"><?php echo htmlspecialchars($user['address'] ?? ''); ?></textarea>
-            </div>
-            <div class="form-group">
-                <label for="specialization">Specialization</label>
-                <input type="text" class="form-control" id="specialization" name="specialization" value="<?php echo htmlspecialchars($user['specialization'] ?? ''); ?>">
-            </div>
-            <button type="submit" class="btn btn-primary">Update Profile</button>
+            <button type="submit" class="btn btn-warning">Change Password</button>
         </form>
+    </div>
 
-        <?php if ($role === 'registrar'): ?>
-            <hr>
+    <?php if ($role === 'registrar'): ?>
+        <div class="add-user-section">
             <h3>Add New User (Judge/Lawyer)</h3>
             <form method="POST" class="mt-4">
                 <input type="hidden" name="add_user">
@@ -175,11 +239,12 @@ $user = $result->fetch_assoc();
                 <button type="submit" class="btn btn-success">Add User</button>
                 <a href="registrar_dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
             </form>
-        <?php endif; ?>
-    </div>
+        </div>
+    <?php endif; ?>
+</div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>

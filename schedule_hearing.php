@@ -228,7 +228,7 @@ $judges_result = $conn->query($judges_sql);
             enableTime: true,
             dateFormat: "Y-m-d H:i",
             minDate: "today",
-            minTime: "08:00",
+            minTime: "01:00",
             maxTime: "17:00",
             disable: [
                 function(date) {

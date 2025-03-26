@@ -1,0 +1,20 @@
+The Judiciary Information System (JIS) is a comprehensive case management system designed for the Attorney General's office to efficiently handle court cases and provide easy access to past cases for lawyers and judges. The system streamlines case management, scheduling, and record-keeping while offering powerful search and analysis tools.
+Key Features
+Core Functionality
+•	Case Management
+o	Unique Case Identification Number (CIN) generation
+o	Defendant information tracking (name, address)
+o	Crime details (type, date/location committed)
+o	Arrest information (officer name, arrest date)
+o	Case lifecycle management (filing, hearings, judgments)
+•	Scheduling System
+o	Visual calendar for hearing date assignment
+o	Conflict prevention for scheduling
+o	Adjournment tracking with reason logging
+o	Automated hearing date suggestions
+•	User Roles & Permissions
+o	Registrars (full case management)
+o	Judges (case browsing, proceedings management)
+o	Lawyers (restricted access with billing for case access)
+
+

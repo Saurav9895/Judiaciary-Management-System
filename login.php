@@ -234,9 +234,9 @@
             </button>
         </form>
         
-        <p class="footer-text">
+        <!-- <p class="footer-text">
             Don't have an account? <a href="signup.php">Create one</a>
-        </p>
+        </p> -->
     </div>
 </body>
 </html>

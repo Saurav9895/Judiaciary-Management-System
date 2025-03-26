@@ -203,11 +203,11 @@ $access_history = $access_stmt->get_result();
                                                 <td><?php echo $case['judge_name']; ?></td>
                                                 <td><?php echo $case['start_date']; ?></td>
                                                 <td>
-                                                    <form method="POST" action="access_case.php">
-                                                        <input type="hidden" name="case_id" value="<?php echo $case['case_id']; ?>">
-                                                        <input type="hidden" name="cin" value="<?php echo $case['cin']; ?>">
-                                                        <button type="submit" class="btn btn-sm btn-primary">View ($10)</button>
-                                                    </form>
+                                                    <button type="button" class="btn btn-sm btn-primary pay-button" 
+                                                            data-case-id="<?php echo $case['case_id']; ?>"
+                                                            data-cin="<?php echo $case['cin']; ?>">
+                                                        Pay $10
+                                                    </button>
                                                 </td>
                                             </tr>
                                         <?php endwhile; ?>
@@ -269,6 +269,53 @@ $access_history = $access_stmt->get_result();
             </div>
         </div>
     </div>
+
+    <!-- Payment Confirmation Modal -->
+    <div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Confirm Payment</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to pay $10 to access this case?</p>
+                    <p><strong>Case CIN:</strong> <span id="caseCin"></span></p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form id="paymentForm" method="POST" action="access_case.php">
+                        <input type="hidden" name="case_id" id="modalCaseId">
+                        <input type="hidden" name="cin" id="modalCaseCin">
+                        <button type="submit" class="btn btn-primary">Confirm Payment</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Payment confirmation modal
+        document.querySelectorAll('.pay-button').forEach(button => {
+            button.addEventListener('click', function() {
+                const caseId = this.getAttribute('data-case-id');
+                const caseCin = this.getAttribute('data-cin');
+                
+                document.getElementById('caseCin').textContent = caseCin;
+                document.getElementById('modalCaseId').value = caseId;
+                document.getElementById('modalCaseCin').value = caseCin;
+                
+                const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
+                modal.show();
+            });
+        });
+
+        // Handle form submission
+        document.getElementById('paymentForm').addEventListener('submit', function(e) {
+            // You could add additional validation or payment processing here
+            // For now, it will submit to access_case.php as before
+        });
+    </script>
 </body>
 </html>

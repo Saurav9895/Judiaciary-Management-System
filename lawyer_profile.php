@@ -67,8 +67,8 @@ $user = $result->fetch_assoc();
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="#">JIS - Lawyer Dashboard</a>
-            <div class="navbar-nav ms-auto">
+        <a class="navbar-brand" href="lawyer_dashboard.php">JIS - Lawyer Dashboard</a>
+        <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php">Search Cases</a>
 
                 <a class="nav-link" href="logout.php">Logout</a>

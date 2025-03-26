@@ -94,7 +94,8 @@ $pending_cases_query = "SELECT c.*, u1.full_name as judge_name, u2.full_name as 
 $pending_cases = $conn->query($pending_cases_query);
 
 // Fetch past cases (closed or hearings in the past)
-$past_cases_query = "SELECT c.*, u1.full_name as judge_name, u2.full_name as lawyer_name, h.hearing_date 
+$past_cases_query = "SELECT c.*, u1.full_name as judge_name, u2.full_name as lawyer_name, 
+                     h.hearing_date, h.adjournment_reason, h.proceedings_summary
                      FROM cases c 
                      LEFT JOIN users u1 ON c.judge_id = u1.user_id 
                      LEFT JOIN users u2 ON c.lawyer_id = u2.user_id 
@@ -372,7 +373,21 @@ $past_cases = $conn->query($past_cases_query);
                         if ($closed_cases_tab->num_rows > 0): ?>
                             <div class="list-group mt-3">
                                 <?php while ($case = $closed_cases_tab->fetch_assoc()): ?>
-                                    <div class="list-group-item">
+                                    <div class="list-group-item case-item" 
+                                         data-bs-toggle="modal" 
+                                         data-bs-target="#caseDetailsModal"
+                                         data-case-id="<?php echo $case['case_id']; ?>"
+                                         data-cin="<?php echo $case['cin']; ?>"
+                                         data-defendant="<?php echo $case['defendant_name']; ?>"
+                                         data-crime="<?php echo $case['crime_type']; ?>"
+                                         data-judge="<?php echo $case['judge_name']; ?>"
+                                         data-lawyer="<?php echo $case['lawyer_name']; ?>"
+                                         data-start-date="<?php echo $case['start_date']; ?>"
+                                         data-status="<?php echo $case['status']; ?>"
+                                         data-description="<?php echo htmlspecialchars($case['description'] ?? ''); ?>"
+                                         data-hearing-date="<?php echo $case['hearing_date']; ?>"
+                                         data-adjournment-reason="<?php echo htmlspecialchars($case['adjournment_reason'] ?? ''); ?>"
+                                         data-proceedings-summary="<?php echo htmlspecialchars($case['proceedings_summary'] ?? ''); ?>">
                                         <div class="d-flex w-100 justify-content-between">
                                             <h6 class="mb-1"><?php echo $case['cin']; ?></h6>
                                             <small class="text-muted">Closed on <?php echo $case['hearing_date']; ?></small>
@@ -401,7 +416,10 @@ $past_cases = $conn->query($past_cases_query);
                         <label for="hearing_id_reschedule" class="form-label">Select Hearing</label>
                         <select class="form-select" id="hearing_id_reschedule" name="hearing_id" required>
                             <option value="">Select a hearing...</option>
-                            <?php while ($hearing = $pending_hearings->fetch_assoc()): ?>
+                            <?php 
+                            // Reset pointer and reuse the pending hearings query
+                            $pending_hearings->data_seek(0);
+                            while ($hearing = $pending_hearings->fetch_assoc()): ?>
                                 <option value="<?php echo $hearing['hearing_id']; ?>">
                                     <?php echo htmlspecialchars($hearing['cin'] . ' - ' . $hearing['defendant_name'] . ' (' . $hearing['crime_type'] . ') - ' . date('M d, Y h:i A', strtotime($hearing['hearing_date']))); ?>
                                 </option>
@@ -457,10 +475,27 @@ $past_cases = $conn->query($past_cases_query);
                 <h5 class="card-title mb-0"><i class="fas fa-archive me-2"></i>Past Cases</h5>
             </div>
             <div class="card-body">
-                <?php if ($past_cases->num_rows > 0): ?>
+                <?php 
+                // Re-fetch past cases for this section
+                $past_cases_display = $conn->query($past_cases_query);
+                if ($past_cases_display->num_rows > 0): ?>
                     <div class="list-group">
-                        <?php while ($case = $past_cases->fetch_assoc()): ?>
-                            <div class="list-group-item list-group-item-action">
+                        <?php while ($case = $past_cases_display->fetch_assoc()): ?>
+                            <div class="list-group-item case-item" 
+                                 data-bs-toggle="modal" 
+                                 data-bs-target="#caseDetailsModal"
+                                 data-case-id="<?php echo $case['case_id']; ?>"
+                                 data-cin="<?php echo $case['cin']; ?>"
+                                 data-defendant="<?php echo $case['defendant_name']; ?>"
+                                 data-crime="<?php echo $case['crime_type']; ?>"
+                                 data-judge="<?php echo $case['judge_name']; ?>"
+                                 data-lawyer="<?php echo $case['lawyer_name']; ?>"
+                                 data-start-date="<?php echo $case['start_date']; ?>"
+                                 data-status="<?php echo $case['status']; ?>"
+                                 data-description="<?php echo htmlspecialchars($case['description'] ?? ''); ?>"
+                                 data-hearing-date="<?php echo $case['hearing_date']; ?>"
+                                 data-adjournment-reason="<?php echo htmlspecialchars($case['adjournment_reason'] ?? ''); ?>"
+                                 data-proceedings-summary="<?php echo htmlspecialchars($case['proceedings_summary'] ?? ''); ?>">
                                 <div class="d-flex w-100 justify-content-between">
                                     <h6 class="mb-1">CIN: <?php echo $case['cin']; ?></h6>
                                     <small>Hearing Date: <?php echo $case['hearing_date']; ?></small>

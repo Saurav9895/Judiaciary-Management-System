@@ -163,12 +163,21 @@ $past_cases = $stmt->get_result();
             font-size: 0.8rem;
             padding: 5px 10px;
         }
+        
+        .past-case-row {
+            transition: all 0.3s;
+        }
+        
+        .past-case-row:hover {
+            background-color: #f8f9fa;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark">
         <div class="container">
-            <a class="navbar-brand" href="#"><i class="fas fa-gavel me-2"></i>JIS - Judge Dashboard</a>
+            <a class="navbar-brand" href="judge_dashboard.php"><i class="fas fa-gavel me-2"></i>JIS - Judge Dashboard</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php"><i class="fas fa-search me-1"></i> Search Cases</a>
                 <a class="nav-link" href="judge_profile.php"><i class="fas fa-user me-1"></i> Profile</a>
@@ -296,7 +305,15 @@ $past_cases = $stmt->get_result();
                                     </thead>
                                     <tbody>
                                         <?php while($case = $past_cases->fetch_assoc()): ?>
-                                        <tr>
+                                        <tr class="past-case-row" 
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#caseModal"
+                                            data-cin="<?php echo $case['cin']; ?>"
+                                            data-defendant="<?php echo $case['defendant_name']; ?>"
+                                            data-crime="<?php echo $case['crime_type']; ?>"
+                                            data-lawyer="<?php echo $case['lawyer_name']; ?>"
+                                            data-hearing="<?php echo $case['hearing_date']; ?>"
+                                            data-status="closed">
                                             <td><?php echo $case['cin']; ?></td>
                                             <td><?php echo $case['defendant_name']; ?></td>
                                             <td><?php echo $case['crime_type']; ?></td>
@@ -347,7 +364,7 @@ $past_cases = $stmt->get_result();
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between">
                                     <span>Status:</span>
-                                    <span id="modal-status" class="badge bg-warning"></span>
+                                    <span id="modal-status" class="badge"></span>
                                 </li>
                             </ul>
                         </div>
@@ -359,7 +376,7 @@ $past_cases = $stmt->get_result();
                                     <span id="modal-lawyer" class="fw-bold"></span>
                                 </li>
                                 <li class="list-group-item d-flex justify-content-between">
-                                    <span>Next Hearing:</span>
+                                    <span>Last Hearing:</span>
                                     <span id="modal-hearing" class="fw-bold"></span>
                                 </li>
                             </ul>
@@ -405,7 +422,15 @@ $past_cases = $stmt->get_result();
                 document.getElementById('modal-crime').textContent = crime;
                 document.getElementById('modal-lawyer').textContent = lawyer;
                 document.getElementById('modal-hearing').textContent = hearing;
-                document.getElementById('modal-status').textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                
+                // Set status badge with appropriate color
+                var statusBadge = document.getElementById('modal-status');
+                statusBadge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+                if (status === 'closed') {
+                    statusBadge.className = 'badge bg-success';
+                } else {
+                    statusBadge.className = 'badge bg-warning';
+                }
                 
                 // Set the full details link
                 document.getElementById('full-details-btn').href = 'case_details.php?cin=' + cin;

@@ -137,7 +137,7 @@ $crime_types = $conn->query($crime_types_query);
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="#">JIS - Registrar Dashboard</a>
+            <a class="navbar-brand" href="registrar_dashboard.php">JIS - Registrar Dashboard</a>
             <div class="navbar-nav ms-auto">
                 <a class="nav-link" href="search_cases.php">Search Cases</a>
                 <!-- <a class="nav-link" href="statistics.php">Statistics</a> -->

@@ -2,6 +2,7 @@
 session_start();
 require_once 'db_connect.php';
 
+// Authentication check
 if (!isset($_SESSION['user_id'])) {
     header("Location: login.php");
     exit();
@@ -14,7 +15,7 @@ if ($_SESSION['role'] !== 'lawyer') {
 
 $lawyer_id = $_SESSION['user_id'];
 
-// Fetch today's hearings for this lawyer
+// Fetch today's hearings
 $today = date('Y-m-d');
 $today_hearings_query = "SELECT c.*, h.hearing_date, h.hearing_id 
                          FROM cases c 
@@ -26,7 +27,7 @@ $stmt->bind_param("is", $lawyer_id, $today);
 $stmt->execute();
 $today_hearings = $stmt->get_result();
 
-// Fetch pending cases for this lawyer
+// Fetch pending cases
 $assigned_cases_query = "SELECT c.*, COALESCE(h.hearing_date, 'No hearing scheduled') as next_hearing, u.full_name as judge_name 
                          FROM cases c 
                          LEFT JOIN hearings h ON c.case_id = h.case_id 
@@ -38,33 +39,22 @@ $stmt->bind_param("i", $lawyer_id);
 $stmt->execute();
 $assigned_cases = $stmt->get_result();
 
-// Fetch past cases for this lawyer
-$past_cases_query = "SELECT c.*, h.hearing_date, u.full_name as judge_name 
+// Fetch past cases with payment status
+$past_cases_query = "SELECT c.*, h.hearing_date, u.full_name as judge_name,
+                     CASE WHEN cb.lawyer_id IS NULL THEN 0 ELSE 1 END as is_paid
                      FROM cases c 
                      LEFT JOIN hearings h ON c.case_id = h.case_id 
-                     LEFT JOIN users u ON c.judge_id = u.user_id 
-                     WHERE c.lawyer_id = ? AND (c.status = 'closed') 
+                     LEFT JOIN users u ON c.judge_id = u.user_id
+                     LEFT JOIN case_browsing_history cb ON c.cin = cb.cin AND cb.lawyer_id = ?
+                     WHERE c.lawyer_id = ? AND c.status = 'closed' 
                      ORDER BY h.hearing_date DESC";
 $stmt = $conn->prepare($past_cases_query);
-$stmt->bind_param("i", $lawyer_id);
+$stmt->bind_param("ii", $lawyer_id, $lawyer_id);
 $stmt->execute();
 $past_cases = $stmt->get_result();
 
-// Fetch all past cases (not assigned to this lawyer)
-$all_past_cases_query = "SELECT c.*, u.full_name as judge_name 
-                         FROM cases c 
-                         LEFT JOIN users u ON c.judge_id = u.user_id 
-                         WHERE c.status = 'closed' AND c.case_id NOT IN (
-                             SELECT case_id FROM case_assignments WHERE user_id = ?
-                         )
-                         ORDER BY c.start_date DESC";
-$stmt = $conn->prepare($all_past_cases_query);
-$stmt->bind_param("i", $lawyer_id);
-$stmt->execute();
-$all_past_cases = $stmt->get_result();
-
-// Fetch case access history with fees
-$access_history_sql = "SELECT c.cin, c.defendant_name, c.crime_type, cb.access_date, cb.fee_amount 
+// Fetch case access history
+$access_history_sql = "SELECT c.cin, c.defendant_name, c.crime_type, cb.access_date, cb.fee_amount
                       FROM case_browsing_history cb
                       JOIN cases c ON cb.cin = c.cin
                       WHERE cb.lawyer_id = ?
@@ -82,40 +72,52 @@ $access_history = $access_stmt->get_result();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lawyer Dashboard - JIS</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .paid-case { background-color: #f8f9fa; }
+        .unpaid-case { opacity: 0.7; }
+        .card { margin-bottom: 20px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .card-header { background-color: #343a40; color: white; font-weight: bold; }
+        .list-group-item { transition: all 0.3s ease; }
+        .list-group-item:hover { background-color: #f8f9fa; }
+        .payment-btn { width: 180px; }
+        .spinner-border { width: 3rem; height: 3rem; }
+    </style>
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="#">JIS - Lawyer Dashboard</a>
+            <a class="navbar-brand" href="lawyer_dashboard.php">JIS - Lawyer Dashboard</a>
             <div class="navbar-nav ms-auto">
-                <a class="nav-link" href="search_cases.php">Search Cases</a>
-                <a class="nav-link" href="lawyer_profile.php">Profile</a>
-                <a class="nav-link" href="logout.php">Logout</a>
+                <a class="nav-link" href="search_cases.php"><i class="bi bi-search"></i> Search</a>
+                <a class="nav-link" href="lawyer_profile.php"><i class="bi bi-person"></i> Profile</a>
+                <a class="nav-link" href="logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a>
             </div>
         </div>
     </nav>
+
     <div class="container mt-4">
         <div class="row">
             <div class="col-md-6">
                 <div class="card mb-4">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">Today's Hearings</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-calendar-event"></i> Today's Hearings</h5>
                     </div>
                     <div class="card-body">
                         <?php if ($today_hearings->num_rows > 0): ?>
                             <div class="list-group">
                                 <?php while($hearing = $today_hearings->fetch_assoc()): ?>
-                                    <a href="case_details.php?cin=<?php echo $hearing['cin']; ?>" class="list-group-item list-group-item-action">
+                                    <a href="case_details.php?cin=<?= htmlspecialchars($hearing['cin']) ?>" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">CIN: <?php echo $hearing['cin']; ?></h6>
-                                            <small>Time: <?php echo $hearing['hearing_date']; ?></small>
+                                            <h6 class="mb-1">CIN: <?= htmlspecialchars($hearing['cin']) ?></h6>
+                                            <small><?= htmlspecialchars($hearing['hearing_date']) ?></small>
                                         </div>
-                                        <p class="mb-1"><?php echo $hearing['defendant_name']; ?> - <?php echo $hearing['crime_type']; ?></p>
+                                        <p class="mb-1"><?= htmlspecialchars($hearing['defendant_name']) ?> - <?= htmlspecialchars($hearing['crime_type']) ?></p>
                                     </a>
                                 <?php endwhile; ?>
                             </div>
                         <?php else: ?>
-                            <p class="text-muted">No hearings scheduled for today</p>
+                            <p class="text-muted">No hearings today</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -123,47 +125,63 @@ $access_history = $access_stmt->get_result();
             <div class="col-md-6">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">My Cases</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-folder"></i> My Active Cases</h5>
                     </div>
                     <div class="card-body">
                         <?php if ($assigned_cases->num_rows > 0): ?>
                             <div class="list-group">
                                 <?php while($case = $assigned_cases->fetch_assoc()): ?>
-                                    <a href="case_details.php?cin=<?php echo $case['cin']; ?>" class="list-group-item list-group-item-action">
+                                    <a href="case_details.php?cin=<?= htmlspecialchars($case['cin']) ?>" class="list-group-item list-group-item-action">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">CIN: <?php echo $case['cin']; ?></h6>
-                                            <small>Next Hearing: <?php echo $case['next_hearing']; ?></small>
+                                            <h6 class="mb-1">CIN: <?= htmlspecialchars($case['cin']) ?></h6>
+                                            <small><?= htmlspecialchars($case['next_hearing']) ?></small>
                                         </div>
-                                        <p class="mb-1"><?php echo $case['defendant_name']; ?> - <?php echo $case['crime_type']; ?></p>
-                                        <small>Judge: <?php echo $case['judge_name']; ?></small>
+                                        <p class="mb-1"><?= htmlspecialchars($case['defendant_name']) ?> - <?= htmlspecialchars($case['crime_type']) ?></p>
+                                        <small>Judge: <?= htmlspecialchars($case['judge_name']) ?></small>
                                     </a>
                                 <?php endwhile; ?>
                             </div>
                         <?php else: ?>
-                            <p class="text-muted">No cases assigned</p>
+                            <p class="text-muted">No active cases</p>
                         <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
+
         <div class="row mt-4">
             <div class="col">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">Past Cases</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-archive"></i> My Past Cases</h5>
                     </div>
                     <div class="card-body">
                         <?php if ($past_cases->num_rows > 0): ?>
-                            <div class="list-group">
+                            <div class="list-group" id="pastCasesList">
                                 <?php while($case = $past_cases->fetch_assoc()): ?>
-                                    <div class="list-group-item list-group-item-action">
+                                    <div class="list-group-item list-group-item-action <?= $case['is_paid'] ? 'paid-case' : 'unpaid-case' ?>"
+                                         id="case-<?= htmlspecialchars($case['cin']) ?>">
                                         <div class="d-flex w-100 justify-content-between">
-                                            <h6 class="mb-1">CIN: <?php echo $case['cin']; ?></h6>
-                                            <small>Hearing Date: <?php echo $case['hearing_date']; ?></small>
+                                            <h6 class="mb-1">CIN: <?= htmlspecialchars($case['cin']) ?></h6>
+                                            <small><?= htmlspecialchars($case['hearing_date']) ?></small>
                                         </div>
-                                        <p class="mb-1"><?php echo $case['defendant_name']; ?> - <?php echo $case['crime_type']; ?></p>
-                                        <small>Judge: <?php echo $case['judge_name']; ?></small>
-                                        <small>Status: <?php echo ucfirst($case['status']); ?></small>
+                                        <p class="mb-1"><?= htmlspecialchars($case['defendant_name']) ?> - <?= htmlspecialchars($case['crime_type']) ?></p>
+                                        <small>Judge: <?= htmlspecialchars($case['judge_name']) ?></small>
+                                        <div class="mt-2 d-flex justify-content-end">
+                                            <?php if ($case['is_paid']): ?>
+                                                <a href="case_details.php?cin=<?= htmlspecialchars($case['cin']) ?>" class="btn btn-sm btn-success payment-btn">
+                                                    <i class="bi bi-eye"></i> View Case
+                                                </a>
+                                            <?php else: ?>
+                                                <button class="btn btn-sm btn-primary payment-btn pay-case-button"
+                                                        data-case-id="<?= htmlspecialchars($case['case_id']) ?>"
+                                                        data-cin="<?= htmlspecialchars($case['cin']) ?>"
+                                                        data-defendant="<?= htmlspecialchars($case['defendant_name']) ?>"
+                                                        data-crime="<?= htmlspecialchars($case['crime_type']) ?>">
+                                                    <i class="bi bi-credit-card"></i> Pay $10 to View
+                                                </button>
+                                            <?php endif; ?>
+                                        </div>
                                     </div>
                                 <?php endwhile; ?>
                             </div>
@@ -174,58 +192,12 @@ $access_history = $access_stmt->get_result();
                 </div>
             </div>
         </div>
+
         <div class="row mt-4">
             <div class="col">
                 <div class="card">
                     <div class="card-header">
-                        <h5 class="card-title mb-0">Public Case Records (Fee: $10 per case)</h5>
-                    </div>
-                    <div class="card-body">
-                        <?php if ($all_past_cases->num_rows > 0): ?>
-                            <div class="table-responsive">
-                                <table class="table table-striped">
-                                    <thead>
-                                        <tr>
-                                            <th>CIN</th>
-                                            <th>Defendant</th>
-                                            <th>Crime Type</th>
-                                            <th>Judge</th>
-                                            <th>Start Date</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php while($case = $all_past_cases->fetch_assoc()): ?>
-                                            <tr>
-                                                <td><?php echo $case['cin']; ?></td>
-                                                <td><?php echo $case['defendant_name']; ?></td>
-                                                <td><?php echo $case['crime_type']; ?></td>
-                                                <td><?php echo $case['judge_name']; ?></td>
-                                                <td><?php echo $case['start_date']; ?></td>
-                                                <td>
-                                                    <button type="button" class="btn btn-sm btn-primary pay-button" 
-                                                            data-case-id="<?php echo $case['case_id']; ?>"
-                                                            data-cin="<?php echo $case['cin']; ?>">
-                                                        Pay $10
-                                                    </button>
-                                                </td>
-                                            </tr>
-                                        <?php endwhile; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                        <?php else: ?>
-                            <p class="text-muted">No public case records available</p>
-                        <?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="row mt-4">
-            <div class="col">
-                <div class="card">
-                    <div class="card-header">
-                        <h5 class="card-title mb-0">Case Access History</h5>
+                        <h5 class="card-title mb-0"><i class="bi bi-clock-history"></i> Payment History</h5>
                     </div>
                     <div class="card-body">
                         <?php if ($access_history->num_rows > 0): ?>
@@ -237,32 +209,37 @@ $access_history = $access_stmt->get_result();
                                             <th>CIN</th>
                                             <th>Defendant</th>
                                             <th>Crime Type</th>
-                                            <th>Fee</th>
+                                            <th>Amount</th>
+                                            <th>Action</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php 
-                                        $total_fees = 0;
-                                        while($access = $access_history->fetch_assoc()): 
-                                            $total_fees += $access['fee_amount'];
-                                        ?>
-                                            <tr>
-                                                <td><?php echo $access['access_date']; ?></td>
-                                                <td><?php echo $access['cin']; ?></td>
-                                                <td><?php echo $access['defendant_name']; ?></td>
-                                                <td><?php echo $access['crime_type']; ?></td>
-                                                <td>$<?php echo number_format($access['fee_amount'], 2); ?></td>
+                                        <?php $total_fees = 0; ?>
+                                        <?php while($access = $access_history->fetch_assoc()): ?>
+                                            <?php $total_fees += $access['fee_amount']; ?>
+                                            <tr class="paid-case">
+                                                <td><?= htmlspecialchars($access['access_date']) ?></td>
+                                                <td><?= htmlspecialchars($access['cin']) ?></td>
+                                                <td><?= htmlspecialchars($access['defendant_name']) ?></td>
+                                                <td><?= htmlspecialchars($access['crime_type']) ?></td>
+                                                <td>$<?= number_format($access['fee_amount'], 2) ?></td>
+                                                <td>
+                                                    <a href="case_details.php?cin=<?= htmlspecialchars($access['cin']) ?>" class="btn btn-sm btn-success">
+                                                        <i class="bi bi-eye"></i> View
+                                                    </a>
+                                                </td>
                                             </tr>
                                         <?php endwhile; ?>
                                         <tr class="table-info">
-                                            <td colspan="4" class="text-right"><strong>Total Fees:</strong></td>
-                                            <td><strong>$<?php echo number_format($total_fees, 2); ?></strong></td>
+                                            <td colspan="4" class="text-end fw-bold">Total Paid:</td>
+                                            <td class="fw-bold">$<?= number_format($total_fees, 2) ?></td>
+                                            <td></td>
                                         </tr>
                                     </tbody>
                                 </table>
                             </div>
                         <?php else: ?>
-                            <p class="text-muted">No case access history</p>
+                            <p class="text-muted">No payment history</p>
                         <?php endif; ?>
                     </div>
                 </div>
@@ -279,16 +256,69 @@ $access_history = $access_stmt->get_result();
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>Are you sure you want to pay $10 to access this case?</p>
-                    <p><strong>Case CIN:</strong> <span id="caseCin"></span></p>
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> You are about to pay $10 to access this case record.
+                    </div>
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-title">Case Details</h6>
+                            <p class="mb-1"><strong>CIN:</strong> <span id="modalCaseCin"></span></p>
+                            <p class="mb-1"><strong>Defendant:</strong> <span id="modalDefendant"></span></p>
+                            <p class="mb-1"><strong>Crime Type:</strong> <span id="modalCrimeType"></span></p>
+                        </div>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="agreeTerms" required>
+                        <label class="form-check-label" for="agreeTerms">
+                            I agree to pay $10 for accessing this case record
+                        </label>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <form id="paymentForm" method="POST" action="access_case.php">
-                        <input type="hidden" name="case_id" id="modalCaseId">
-                        <input type="hidden" name="cin" id="modalCaseCin">
-                        <button type="submit" class="btn btn-primary">Confirm Payment</button>
-                    </form>
+                    <button type="button" class="btn btn-primary" id="confirmPaymentBtn" disabled>
+                        <i class="bi bi-credit-card"></i> Confirm Payment
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Processing Modal -->
+    <div class="modal fade" id="processingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Processing Payment</h5>
+                </div>
+                <div class="modal-body text-center">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Please wait while we process your payment...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Success Modal -->
+    <div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title">Payment Successful</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                    <p class="mt-3">Your payment of $10 has been processed successfully!</p>
+                    <p>You can now access the case details.</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn btn-success" id="viewCaseBtn">
+                        <i class="bi bi-eye"></i> View Case Now
+                    </a>
                 </div>
             </div>
         </div>
@@ -296,26 +326,98 @@ $access_history = $access_stmt->get_result();
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // Payment confirmation modal
-        document.querySelectorAll('.pay-button').forEach(button => {
-            button.addEventListener('click', function() {
-                const caseId = this.getAttribute('data-case-id');
-                const caseCin = this.getAttribute('data-cin');
+        // Payment flow handling
+        let currentCase = {
+            id: null,
+            cin: null,
+            defendant: null,
+            crimeType: null
+        };
+
+        // Set up payment buttons
+        document.querySelectorAll('.pay-case-button').forEach(btn => {
+            btn.addEventListener('click', function() {
+                currentCase = {
+                    id: this.dataset.caseId,
+                    cin: this.dataset.cin,
+                    defendant: this.dataset.defendant,
+                    crimeType: this.dataset.crime
+                };
                 
-                document.getElementById('caseCin').textContent = caseCin;
-                document.getElementById('modalCaseId').value = caseId;
-                document.getElementById('modalCaseCin').value = caseCin;
+                // Update modal with case details
+                document.getElementById('modalCaseCin').textContent = currentCase.cin;
+                document.getElementById('modalDefendant').textContent = currentCase.defendant;
+                document.getElementById('modalCrimeType').textContent = currentCase.crimeType;
                 
-                const modal = new bootstrap.Modal(document.getElementById('paymentModal'));
-                modal.show();
+                // Reset and show modal
+                document.getElementById('agreeTerms').checked = false;
+                document.getElementById('confirmPaymentBtn').disabled = true;
+                
+                const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+                paymentModal.show();
             });
         });
 
-        // Handle form submission
-        document.getElementById('paymentForm').addEventListener('submit', function(e) {
-            // You could add additional validation or payment processing here
-            // For now, it will submit to access_case.php as before
+        // Enable confirm button when terms are checked
+        document.getElementById('agreeTerms').addEventListener('change', function() {
+            document.getElementById('confirmPaymentBtn').disabled = !this.checked;
         });
+
+        // Handle payment confirmation
+        document.getElementById('confirmPaymentBtn').addEventListener('click', function() {
+            const paymentModal = bootstrap.Modal.getInstance(document.getElementById('paymentModal'));
+            paymentModal.hide();
+            
+            // Show processing modal
+            const processingModal = new bootstrap.Modal(document.getElementById('processingModal'));
+            processingModal.show();
+            
+            // Make AJAX call to process payment
+            fetch('process_payment.php', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `case_id=${currentCase.id}&cin=${currentCase.cin}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                processingModal.hide();
+                if (data.success) {
+                    // Update the UI to show "View Case" button
+                    const caseElement = document.getElementById(`case-${currentCase.cin}`);
+                    caseElement.classList.remove('unpaid-case');
+                    caseElement.classList.add('paid-case');
+                    
+                    // Replace Pay button with View button
+                    const payButton = caseElement.querySelector('.pay-case-button');
+                    if (payButton) {
+                        payButton.outerHTML = `
+                            <a href="case_details.php?cin=${currentCase.cin}" class="btn btn-sm btn-success payment-btn">
+                                <i class="bi bi-eye"></i> View Case
+                            </a>
+                        `;
+                    }
+                    
+                    // Show success modal
+                    const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+                    document.getElementById('viewCaseBtn').href = `case_details.php?cin=${currentCase.cin}`;
+                    successModal.show();
+                } else {
+                    alert('Payment failed: ' + (data.message || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                processingModal.hide();
+                alert('Payment processing error: ' + error.message);
+            });
+        });
+
+        // Check for payment success in URL
+        if (window.location.search.includes('payment=success')) {
+            const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+        }
     </script>
 </body>
 </html>
